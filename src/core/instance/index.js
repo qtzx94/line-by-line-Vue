@@ -4,6 +4,7 @@ import { stateMixin } from './state'
 import { eventsMixin } from './events'
 import { lifecycleMixin } from './lifecycle'
 import { renderMixin } from './render'
+
 import { warn } from '../util/index'
 
 // 定义Vue构造函数

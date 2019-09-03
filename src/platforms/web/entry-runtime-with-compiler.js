@@ -9,12 +9,14 @@ import { query } from './util/index'
 import { compileToFunctions } from './compiler/index'
 import { shouldDecodeNewlines, shouldDecodeNewlinesForHref } from './util/compat'
 
+// 根据id获取元素的innerHTML
 const idToTemplate = cached(id => {
   const el = query(id)
   return el && el.innerHTML
 })
-
+// 使用mount变量缓存Vue.prototype.$mount方法
 const mount = Vue.prototype.$mount
+// 重写Vue.prototype.$mount方法
 Vue.prototype.$mount = function (
   el?: string | Element,
   hydrating?: boolean
@@ -86,6 +88,7 @@ Vue.prototype.$mount = function (
  * Get outerHTML of elements, taking care
  * of SVG elements in IE as well.
  */
+// 获取元素的outHTML
 function getOuterHTML (el: Element): string {
   if (el.outerHTML) {
     return el.outerHTML
@@ -96,6 +99,8 @@ function getOuterHTML (el: Element): string {
   }
 }
 
+// 在Vue上添加一个全局API `Vue.compile` 其值为上面导入进来的compileToFunctions
 Vue.compile = compileToFunctions
 
+// 导出Vue
 export default Vue

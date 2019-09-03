@@ -14,13 +14,13 @@ let uid = 0
 
 export function initMixin (Vue: Class<Component>) {
   Vue.prototype._init = function (options?: Object) {
-    const vm: Component = this
+    const vm: Component = this // 声明了常量vm，其值为this，也就是当前这个Vue实例
     // a uid
-    vm._uid = uid++
+    vm._uid = uid++ // 在实例上声明了一个唯一标示：_uid，实际上_uid就是一个Vue实例的实例属性
 
     let startTag, endTag
     /* istanbul ignore if */
-    if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
+    if (process.env.NODE_ENV !== 'production' && config.performance && mark) { // 在非生产环境下
       startTag = `vue-perf-start:${vm._uid}`
       endTag = `vue-perf-end:${vm._uid}`
       mark(startTag)
