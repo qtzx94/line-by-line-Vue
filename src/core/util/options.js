@@ -26,14 +26,26 @@ import {
  * how to merge a parent option value and a child option
  * value into the final value.
  */
-const strats = config.optionMergeStrategies
+const strats = config.optionMergeStrategies // Object.create(null)
 
 /**
  * Options with restrictions
  */
 if (process.env.NODE_ENV !== 'production') {
-	strats.el = strats.propsData = function (parent, child, vm, key) {
+	strats.el = strats.propsData = function (parent, child, vm, key) { //非生产环境下策略对象添加两个策略（属性）el和propsData，属性值是一个函数，用来合并（处理）el和propsData选项
 		if (!vm) {
+			// 策略函数中的vm来自于mergeOptions函数的第三个参数，当调用mergeOptions函数且不传递第三个参数的时候，在策略函数中就拿不到vm参数；
+			// 由此猜测，mergeOptions函数除了在_init方法中被调用之外，还在其他地方被调用，且没有传递第三个参数，即Vue.extend方法中被调用，
+			// core/global-api/extend.js 文件找到 Vue.extend 方法，其中有这么一段代码：
+			// Sub.options = mergeOptions(
+			// 	Super.options,
+			// 	extendOptions
+			// )
+			// 此时调用mergeOptions函数就没有传递第三个参数，也就是说通过Vue.extend创建子类的时候，mergeOptions会被调用，此时策略函数就拿不到第三个参数vm
+			// 所以在策略函数中通过判断是否存在vm参数就能够得知mergeOptions是在实例化时调用（使用new操作符走_init方法）还是在继承时调用（Vue.extend），
+			// 而子组件的实现方式就是通过实例化子类完成的，子类又是通过Vue.extend创建的，所以我们就能通过对vm的判断得知是否是子组件了
+
+			// 结论：如果策略函数中拿不到vm参数，那么处理的就是子组件的选项
 			warn(
 				`option "${key}" can only be used during instance ` +
 				'creation with the `new` keyword.'
@@ -259,7 +271,7 @@ strats.props =
 strats.provide = mergeDataOrFn
 
 /**
- * Default strategy.
+ * Default strategy. 默认策略： 只要子选项不是undefined，那么就用子选项，否则使用复选项
  */
 const defaultStrat = function (parentVal: any, childVal: any): any {
 	return childVal === undefined
@@ -424,7 +436,7 @@ function normalizeInject(options: Object, vm: ?Component) {
  */
 
 // directives 选项用来注册局部指令，比如下面的代码我们注册了两个局部指令分别是 v-test1 和 v-test2：
-{/* <div id="app" v-test1 v-test2>{{ test }}</div> */}
+{/* <div id="app" v-test1 v-test2>{{ test }}</div> */ }
 
 // var vm = new Vue({
 // 	el: '#app',
@@ -515,7 +527,7 @@ export function mergeOptions(
 	// Only merged options has the _base property.
 	if (!child._base) {
 		if (child.extends) {
-			parent = mergeOptions(parent, child.extends, vm)
+			parent = mergeOptions(parent, child.extends, vm) // 递归调用 mergeOptions 函数将 parent 与 child.extends 进行合并
 		}
 		if (child.mixins) {
 			for (let i = 0, l = child.mixins.length; i < l; i++) {
@@ -529,12 +541,28 @@ export function mergeOptions(
 	for (key in parent) {
 		mergeField(key)
 	}
+	// 假设parent就是Vue.options：
+	// Vue.options = {
+	// 	components: {
+	// 		KeepAlive
+	// 		Transition,
+	// 		TransitionGroup
+	// 	},
+	// 	directives: {
+	// 		model,
+	// 		show
+	// 	},
+	// 	filters: Object.create(null),
+	// 	_base: Vue
+	// }
+	// 则key值就是components、directives、filters 以及 _base，除了 _base 其他的字段都可以理解为是 Vue 提供的选项的名字
 	for (key in child) {
-		if (!hasOwn(parent, key)) {
+		if (!hasOwn(parent, key)) { // hasOwn函数其作用是用来判断一个属性是否是对象自身的属性(不包括原型上的),所以这个判断语句的意思是, 如果 child 对象的键也在 parent 上出现，那么就不要再调用 mergeField 的了，因为在上一个 for in 循环中已经调用过了，这就避免了重复调用。
 			mergeField(key)
 		}
 	}
 	function mergeField(key) {
+		// 当一个选项没有对应的策略函数时，使用默认策略
 		const strat = strats[key] || defaultStrat
 		options[key] = strat(parent[key], child[key], vm, key)
 	}
