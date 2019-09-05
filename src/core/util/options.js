@@ -58,13 +58,14 @@ if (process.env.NODE_ENV !== 'production') {
 /**
  * Helper that recursively merges two data objects together.
  */
-function mergeData(to: Object, from: ?Object): Object {
+// 从mergeData最后返回的值return to可以看出，mergeData函数的作用是：将from对象的属性混合到to对象中，也可以说是将parentVal对象的属性混合到childVal中，最后返回的是处理后的childVal对象
+function mergeData(to: Object, from: ?Object): Object { // 根据mergeData函数被调用时参数传递顺序可知，to对应childVal产生的纯对象，from对应parentVal产生的纯对象
 	if (!from) return to
 	let key, toVal, fromVal
 
 	const keys = hasSymbol
-		? Reflect.ownKeys(from)
-		: Object.keys(from)
+		? Reflect.ownKeys(from)  // Reflect.ownKeys()返回所有自有属性key，不管是否可枚举，但不包括继承自原型的属性
+		: Object.keys(from) // Object.keys()主要用于遍历对象自有的可枚举属性，不包括继承自原型的属性和不可枚举的属性
 
 	for (let i = 0; i < keys.length; i++) {
 		key = keys[i]
@@ -72,9 +73,9 @@ function mergeData(to: Object, from: ?Object): Object {
 		if (key === '__ob__') continue
 		toVal = to[key]
 		fromVal = from[key]
-		if (!hasOwn(to, key)) {
+		if (!hasOwn(to, key)) { // 如果from对象中的key不在to对象中，则使用set函数为to对象设置key及相应的值
 			set(to, key, fromVal)
-		} else if (
+		} else if ( // 如果from对象中的key和to对象中的key不相同，且这两个属性的值都是纯对象，则递归进行深度合并
 			toVal !== fromVal &&
 			isPlainObject(toVal) &&
 			isPlainObject(fromVal)
@@ -89,11 +90,11 @@ function mergeData(to: Object, from: ?Object): Object {
  * Data
  */
 export function mergeDataOrFn(
-	parentVal: any,
-	childVal: any,
+	parentVal: any, // parentVal，即 Parent.options 下的 data 选项
+	childVal: any, // childVal，即 Child.options 下的 data 选项
 	vm?: Component
 ): ?Function {
-	if (!vm) {
+	if (!vm) { // 处理的是子组件选项
 		// in a Vue.extend merge, both should be functions
 		if (!childVal) {
 			return parentVal
@@ -106,16 +107,21 @@ export function mergeDataOrFn(
 		// merged result of both functions... no need to
 		// check if parentVal is a function here because
 		// it has to be a function to pass previous merges.
-		return function mergedDataFn() {
+
+		// 当父子选项同时存在，那么就返回一个函数 mergedDataFn
+		return function mergedDataFn() { // mergeDataOrFn 函数在处理子组件选项时返回的总是一个函数，这也就间接导致 strats.data 策略函数在处理子组件选项时返回的也总是一个函数
 			return mergeData(
-				typeof childVal === 'function' ? childVal.call(this, this) : childVal,
+				typeof childVal === 'function' ? childVal.call(this, this) : childVal, // 第一个 this 指定了 data 函数的作用域，而第二个 this 就是传递给 data 函数的参数
 				typeof parentVal === 'function' ? parentVal.call(this, this) : parentVal
 			)
 		}
 	} else {
 		return function mergedInstanceDataFn() {
 			// instance merge
-			const instanceData = typeof childVal === 'function'
+			// childVal 要么是子组件的选项，要么是使用 new 操作符创建实例时的选项，无论是哪一种，总之 childVal 要么是函数，要么就是一个纯对象。
+			// 所以如果是函数的话就通过执行该函数从而获取到一个纯对象，判断 childVal 和 parentVal 的类型是否是函数的目的只有一个，获取数据对象(纯对象)。
+			// 所以 mergedDataFn 和 mergedInstanceDataFn 函数内部调用 mergeData 方法时传递的两个参数就是两个纯对象(当然你可以简单的理解为两个JSON对象)。
+			const instanceData = typeof childVal === 'function' 
 				? childVal.call(vm, vm)
 				: childVal
 			const defaultData = typeof parentVal === 'function'
@@ -130,13 +136,17 @@ export function mergeDataOrFn(
 	}
 }
 
-strats.data = function (
+// strats.data策略函数无论合并处理的是子组件选项还是非子组件选项，其最终都是调用mergeDataOrFn函数进行处理的，并且以mergeDataOrFn函数的返回值作为策略函数的最终返回值
+// 为什么最终strats.data会被处理成一个函数：
+// 因为通过函数返回数据对象，保证了每个组件实例都有一个唯一的数据副本，避免了组件间数据互相影响
+strats.data = function ( // 在 strats 策略对象上添加 data 策略函数，用来合并处理 data 选项
 	parentVal: any,
 	childVal: any,
 	vm?: Component
 ): ?Function {
-	if (!vm) {
-		if (childVal && typeof childVal !== 'function') {
+	if (!vm) { // 当没有vm参数时，说明处理的是子组件选项
+		if (childVal && typeof childVal !== 'function') { // childVal即指子组件的data选项
+			// 如果传入的子组件data类型不是function，会跳出警告，所以"子组件中的data必须是一个返回对象的函数"，如果不是函数，除了跳出警告，会直接返回parentVal
 			process.env.NODE_ENV !== 'production' && warn(
 				'The "data" option should be a function ' +
 				'that returns a per-instance value in component ' +
@@ -148,7 +158,7 @@ strats.data = function (
 		}
 		return mergeDataOrFn(parentVal, childVal)
 	}
-
+	// 如果拿到了vm参数，说明处理的选项不是子组件选项，而是使用new操作符创建实例时的选项
 	return mergeDataOrFn(parentVal, childVal, vm)
 }
 
