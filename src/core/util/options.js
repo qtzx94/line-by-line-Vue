@@ -165,6 +165,14 @@ strats.data = function ( // 在 strats 策略对象上添加 data 策略函数�
 /**
  * Hooks and props are merged as arrays.
  */
+// 三组三目运算符
+// return (是否有childVal，即判断组件的选项中是否有对应名字的生命周期钩子函数)
+// 	? 如果有childVal则判断是否有parentVal
+// 		? 如果有parentVal则使用concat方法将二者合并为一个数组
+// 		: 如果没有parentVal则判断childVal是不是一个数组
+// 			? 如果childVal是一个数组则直接返回
+// 			: 否则将其作为数组的元素，然后返回数组
+// 	: 如果没有childVal则直接返回parentVal
 function mergeHook(
 	parentVal: ?Array<Function>,
 	childVal: ?Function | ?Array<Function>
@@ -191,8 +199,23 @@ function dedupeHooks(hooks) {
 	return res
 }
 
+// export const LIFECYCLE_HOOKS = [
+// 	'beforeCreate',
+// 	'created',
+// 	'beforeMount',
+// 	'mounted',
+// 	'beforeUpdate',
+// 	'updated',
+// 	'beforeDestroy',
+// 	'destroyed',
+// 	'activated',
+// 	'deactivated',
+// 	'errorCaptured',
+// 	'serverPrefetch'
+// ]
+
 LIFECYCLE_HOOKS.forEach(hook => {
-	strats[hook] = mergeHook
+	strats[hook] = mergeHook // 在strats策略对象上添加用来合并各个生命周期钩子选项的策略函数mergeHook
 })
 
 /**
