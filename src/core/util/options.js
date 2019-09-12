@@ -1,5 +1,17 @@
 /* @flow */
 
+/**
+ * 选项处理小结:
+ * 	1.对于el、propsData选项使用默认的合并策略defaultStrat
+ *  2.对于data选项，使用mergeDataOrFn函数进行处理，最终结果是data选项变成一个函数，且该函数执行的结果为真正的数据对象
+ *  3.对于生命周期钩子选项，将合并成数组，使得斧子选项中的钩子函数都能够被执行
+ *  4.对于directives、filters以及components等资源选项，父子选项将以原型链的形式被处理，正是因为这样我们才能够在任何地方都使用内置组件、指令等
+ *  5.对于watch选项的合并处理，类似于生命周期钩子，如果父子选项都有相同的观测字段，将被合并为数组，这样观察者都将被执行
+ *  6.对于props、methods、inject、computed选项，父选项始终可用，但是子选项会覆盖同名的父选项字段
+ *  7.对于provide选项，其合并策略使用与data选项相同的mergeDataOrFn函数
+ *  8.最后，以上没有提及到的选项都将使用默认选项defaultStrat，具体：只要子选项不是undefined就使用子选项，否则使用父选项
+ */
+
 import config from '../config'
 import { warn } from './debug'
 import { set } from '../observer/index'
@@ -356,23 +368,27 @@ strats.watch = function (
  * Other object hashes.
  */
 strats.props =
-	strats.methods =
-	strats.inject =
-	strats.computed = function (
-		parentVal: ?Object,
-		childVal: ?Object,
-		vm?: Component,
-		key: string
-	): ?Object {
-		if (childVal && process.env.NODE_ENV !== 'production') {
-			assertObjectType(key, childVal, vm)
-		}
-		if (!parentVal) return childVal
-		const ret = Object.create(null)
-		extend(ret, parentVal)
-		if (childVal) extend(ret, childVal)
-		return ret
+strats.methods =
+strats.inject =
+strats.computed = function (
+	parentVal: ?Object,
+	childVal: ?Object,
+	vm?: Component,
+	key: string
+): ?Object {
+	if (childVal && process.env.NODE_ENV !== 'production') {
+		assertObjectType(key, childVal, vm)
 	}
+	if (!parentVal) return childVal
+	// 如果 parentVal 存在，则创建 ret 对象
+	const ret = Object.create(null)
+	// 将 parentVal 属性混合到 ret 中
+	extend(ret, parentVal)
+	// 如果 childVal 也存在的话，那么同样会再使用 extend 函数将其属性混合到 ret 中，所以如果父子选项中有相同的键，那么子选项会把父选项覆盖掉
+	if (childVal) extend(ret, childVal)
+	return ret
+}
+// provide 选项的合并策略与 data 选项的合并策略相同，都是使用 mergeDataOrFn 函数
 strats.provide = mergeDataOrFn
 
 /**
@@ -636,6 +652,7 @@ export function mergeOptions(
 		}
 		if (child.mixins) {
 			for (let i = 0, l = child.mixins.length; i < l; i++) {
+				// mergeOptions 函数在处理 mixins 选项的时候递归调用了 mergeOptions 函数将 minxis 合并到了 parent 中，并将合并后生成的新对象作为新的 parent
 				parent = mergeOptions(parent, child.mixins[i], vm)
 			}
 		}
