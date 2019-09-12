@@ -121,7 +121,7 @@ export function mergeDataOrFn(
 			// childVal 要么是子组件的选项，要么是使用 new 操作符创建实例时的选项，无论是哪一种，总之 childVal 要么是函数，要么就是一个纯对象。
 			// 所以如果是函数的话就通过执行该函数从而获取到一个纯对象，判断 childVal 和 parentVal 的类型是否是函数的目的只有一个，获取数据对象(纯对象)。
 			// 所以 mergedDataFn 和 mergedInstanceDataFn 函数内部调用 mergeData 方法时传递的两个参数就是两个纯对象(当然你可以简单的理解为两个JSON对象)。
-			const instanceData = typeof childVal === 'function' 
+			const instanceData = typeof childVal === 'function'
 				? childVal.call(vm, vm)
 				: childVal
 			const defaultData = typeof parentVal === 'function'
@@ -240,6 +240,64 @@ function mergeAssets(
 	}
 }
 
+/**
+ * 举个例子，大家知道任何组件的模板中我们都可以直接使用 <transition/> 组件或者 <keep-alive/> 等，
+ * 但是我们并没有在我们自己的组件实例的 components 选项中显示的声明这些组件。
+ * 那么这是怎么做到的呢？其实答案就在 mergeAssets 函数中。以下面的代码为例：
+ * var v = new Vue({
+		el: '#app',
+		components: {
+			ChildComponent: ChildComponent
+		}
+ * })
+ * 上面的代码中，我们创建了一个Vue实例，并注册了一个子组件ChildComponent，此时mergeAssets方法内的childVal就是例子中的components选项：
+ * components: {
+		ChildComponent: ChildComponent
+ * }
+ * 而parentVal就是Vue.optionscomponents，已知Vue.options如下：
+ * Vue.options = {
+		components: {
+			KeepAlive,
+			Transition,
+			TransitionGroup
+		},
+		directives: Object.create(null),
+		directives: {
+			model,
+			show
+		},
+		filters: Object.create(null),
+		_base: Vue
+ * 	}
+ *所以Vue.options.components就是对象：
+ * components: {
+		KeepAlive,
+		Transition,
+		TransitionGroup
+ *	}
+ * 也就是说parentVal就是如上包含三个内置组件对象，所以经过如下这句话后：
+ * const res = Object.create(parentVal || null)
+ * 你可以通过res.KeepAlive 访问当前KeepAlive对象，因为虽然res对象自身属性没有KeepAlive，但是它原型上有，
+ * 再经过return extend(res, childVal)这句话后，res变量添加ChildComponent属性，最终res如下：
+ * res = {
+ * 		ChildComponent
+ * 		// 原型
+ * 		__proto__: {
+ * 			KeepAlive,
+ * 			Transition,
+ * 			TransitionGroup
+ * 		}
+ * }
+ * 这就是为什么我们不用显示的注册组件就能使用一些内置组件的原因，同时这也是内置组件的实现方式，通过Vue.extend创建出来的子类也是一样的道理，一层一层的通过原型进行组件的搜索
+ * 
+ */
+
+
+// export const ASSET_TYPES = [
+// 	'component',
+// 	'directive',
+// 	'filter'
+// ]
 ASSET_TYPES.forEach(function (type) {
 	strats[type + 's'] = mergeAssets
 })
@@ -502,7 +560,7 @@ function normalizeDirectives(options: Object) {
 }
 
 function assertObjectType(name: string, value: any, vm: ?Component) {
-	if (!isPlainObject(value)) {
+	if (!isPlainObject(value)) { // isPlainObject用来检测 childVal 是不是一个纯对象的
 		warn(
 			`Invalid value for option "${name}": expected an Object, ` +
 			`but got ${toRawType(value)}.`,
