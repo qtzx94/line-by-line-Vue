@@ -317,24 +317,38 @@ strats.watch = function (
 	// work around Firefox's Object.prototype.watch...
 	if (parentVal === nativeWatch) parentVal = undefined
 	if (childVal === nativeWatch) childVal = undefined
+	/**
+	 * nativeWatch:
+	 * 在 Firefox 浏览器中 Object.prototype 拥有原生的 watch 函数，所以即便一个普通的对象你没有定义 watch 属性，但是依然可以通过原型链访问到原生的 watch 属性，
+	 * 这就会给 Vue 在处理选项的时候造成迷惑，因为 Vue 也提供了一个叫做 watch 的选项，即使你的组件选项中没有写 watch 选项，但是 Vue 通过原型访问到了原生的 watch。这不是我们想要的，
+	 * 所以上面两句代码的目的是一个变通方案，当发现组件选项是浏览器原生的 watch 时，那说明用户并没有提供 Vue 的 watch 选项，直接重置为 undefined。
+	 */
 	/* istanbul ignore if */
-	if (!childVal) return Object.create(parentVal || null)
+	if (!childVal) return Object.create(parentVal || null) // 检测了是否有 childVal，即组件选项是否有 watch 选项，如果没有的话，直接以 parentVal 为原型创建对象并返回(如果有 parentVal 的话)。
 	if (process.env.NODE_ENV !== 'production') {
-		assertObjectType(key, childVal, vm)
+		assertObjectType(key, childVal, vm) // 判断childVal是否是纯对象
 	}
 	if (!parentVal) return childVal
+	// 当存在parentVal以及childVal，代码继续执行做合并处理
 	const ret = {}
+	// 将 parentVal 的属性混合到 ret 中，后面处理的都将是 ret 对象，最后返回的也是 ret 对象
 	extend(ret, parentVal)
 	for (const key in childVal) {
+		// 遍历childVal，所以key是子选项的key，父选项中未必能获取到值，所以parent未必有值
 		let parent = ret[key]
+		// child肯定有值，因为遍历的就是childVal本身
 		const child = childVal[key]
+		// 如果parent存在，就将其转为数组
 		if (parent && !Array.isArray(parent)) {
 			parent = [parent]
 		}
 		ret[key] = parent
+			// 最后，如果 parent 存在，此时的 parent 应该已经被转为数组了，所以直接将 child concat 进去
 			? parent.concat(child)
+			// 如果 parent 不存在，直接将 child 转为数组返回
 			: Array.isArray(child) ? child : [child]
 	}
+	// 最后返回新的 ret 对象
 	return ret
 }
 
