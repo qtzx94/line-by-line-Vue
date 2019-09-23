@@ -62,7 +62,7 @@ export function initMixin(Vue: Class<Component>) {
 			vm._renderProxy = vm
 		}
 		// expose real self
-		vm._self = vm
+		vm._self = vm // 在Vue实例对象vm上添加了_self属性，指向真实的实例本身
 		// 第三步： vm的生命周期相关变量初始化
 		initLifecycle(vm)
 		// 第四步：vm的事件监听初始化

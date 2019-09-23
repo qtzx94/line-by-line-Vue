@@ -6,7 +6,7 @@ import { warn, makeMap, isNative } from '../util/index'
 let initProxy
 
 if (process.env.NODE_ENV !== 'production') {
-  const allowedGlobals = makeMap(
+  const allowedGlobals = makeMap(  // allowedGlobals 函数的作用是判断给定的 key 是否出现在上面字符串中定义的关键字中的
     'Infinity,undefined,NaN,isFinite,isNaN,' +
     'parseFloat,parseInt,decodeURI,decodeURIComponent,encodeURI,encodeURIComponent,' +
     'Math,Number,Date,Array,Object,Boolean,String,RegExp,Map,Set,JSON,Intl,' +
@@ -35,7 +35,7 @@ if (process.env.NODE_ENV !== 'production') {
   }
 
   const hasProxy =
-    typeof Proxy !== 'undefined' && isNative(Proxy)
+    typeof Proxy !== 'undefined' && isNative(Proxy) // 判断当前宿主环境是否支持原生 Proxy
 
   if (hasProxy) {
     const isBuiltInModifier = makeMap('stop,prevent,self,ctrl,shift,alt,meta,exact')
@@ -75,8 +75,8 @@ if (process.env.NODE_ENV !== 'production') {
     }
   }
 
-  initProxy = function initProxy (vm) {
-    if (hasProxy) {
+  initProxy = function initProxy (vm) { // initProxy函数的作用是对实例对象vm的代理，通过原生Proxy实现
+    if (hasProxy) { // hasProxy，用来判断宿主环境是否支持js的原生Proxy特性
       // determine which proxy handler to use
       const options = vm.$options
       const handlers = options.render && options.render._withStripped
@@ -84,7 +84,7 @@ if (process.env.NODE_ENV !== 'production') {
         : hasHandler
       vm._renderProxy = new Proxy(vm, handlers)
     } else {
-      vm._renderProxy = vm
+      vm._renderProxy = vm // 不存在Proxy，直接赋值
     }
   }
 }
