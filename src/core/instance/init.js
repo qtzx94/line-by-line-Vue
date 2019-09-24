@@ -68,12 +68,13 @@ export function initMixin(Vue: Class<Component>) {
 		// 第四步：vm的事件监听初始化
 		initEvents(vm)
 		initRender(vm)
+		// callHook函数的作用是调用生命周期钩子函数
 		callHook(vm, 'beforeCreate')
 		initInjections(vm) // resolve injections before data/props
-		// 第五步： vm的状态初始化，prop/data/computed/method/watch都在这里完成初始化，因此也是Vue实例create的关键。
+		// 第五步： vm的状态初始化，props/data/computed/methods/watch都在这里完成初始化，所以在beforeCreate这个生命周期钩子被调用的时候，这些内容都不能使用。
 		initState(vm)
 		initProvide(vm) // resolve provide after data/props
-		callHook(vm, 'created')
+		callHook(vm, 'created') // 使用在created钩子中，是可以访问到上述内容的，但是此时还没有任何挂载的操作，所以在created中是不能访问dom的，即不能访问$el
 
 		/* istanbul ignore if */
 		if (process.env.NODE_ENV !== 'production' && config.performance && mark) {
