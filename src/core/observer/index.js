@@ -151,6 +151,34 @@ export function observe(value: any, asRootData: ?boolean): Observer | void { // 
 	return ob
 }
 
+// 在javaScript中，对象的属性分成两种类型：数据属性和访问器属性
+        
+/**
+ * 一、数据属性：
+ * 1.数据属性：它包含的是一个数据值的位置，在这可以对数据值进行读写
+ * 2.数据属性包含四个特性：
+ *      configurable: 表示能否通过delete删除属性从而重新定义属性，能否修改属性的特性，或能否把属性修改为访问器属性，默认为true
+ *      enumerable：表示能否通过for-in循环返回属性
+ *      writable： 表示能否修改属性的值
+ *      value：包含该属性的数据值。默认为undefined
+ *   
+ *   通过Object.getOwnPropertyDescriptor(obj, key)获取指定属性的描述
+ *   通过Object.definePorperty(obj, key, descriptor)修改指定单个属性的默认特性
+ */
+
+/**
+ * 二、访问器属性：
+ * 1.访问器属性：这个属性不包含数据值，包含的是一对get和set方法，在读写访问器属性时，就是通过这两个方法来进行操作处理的
+ * 2.访问器属性包含四个特性：
+ *     configurable: 表示能否通过delete删除属性从而重新定义属性，能否修改属性的特性，或能否把属性修改为访问器属性，默认为false
+ *     enumerable：表示能否通过for-in循环返回属性
+ *     Get：在读取属性时调用的函数，默认值为undefined
+ *     Set：在写入属性时调用的函数，默认值为undefined
+ * 
+ *   访问器属性不能直接定义，要通过Object.defineProperty()这个方法来定义
+ *   
+ */ 
+
 /**
  * Define a reactive property on an Object.
  */
@@ -172,20 +200,32 @@ export function defineReactive(
 	// cater for pre-defined getter/setters
 	const getter = property && property.get
 	const setter = property && property.set
-	if ((!getter || setter) && arguments.length === 2) { // 当只传递两个参数时，说明没有传递第三个参数 val，那么此时需要根据 key 主动去对象上获取相应的值，即执行 if 语句块内的代码：val = obj[key]
+	// 当只传递两个参数时，说明没有传递第三个参数 val，那么此时需要根据 key 主动去对象上获取相应的值，即执行 if 语句块内的代码：val = obj[key]
+	
+	// 定义响应式数据时行为的不一致问题：当数据对象的某一个属性只拥有get拦截器函数而没有set拦截器函数时，此时该属性不会被深度观测，但经过defineReactive函数处理后，该属性将被重新定义getter和setter，此时该属性即拥有get函数又拥有set函数
+	// 并且当我们尝试给该属性重新赋值时，新的值将被观测，此时出现矛盾：原本该属性不会被深度观测，但是重新赋值之后，新的值却被观测了，
+	// 所以为解决上述问题，当属性拥有原本的setter时，即使拥有getter也要获取属性值并观测之，即(!getter || setter)
+	if ((!getter || setter) && arguments.length === 2) { //这两个条件要同时满足才能会根据 key 去对象 obj 上取值：val = obj[key]，否则就不会触发取值的动作，
+														// 触发不了取值的动作就意味着 val 的值为 undefined，这会导致 if 语句块后面的那句深度观测的代码无效，即不会深度观测。
+														// 如果数据对象的某个属性原本就拥有自己的 get 函数，那么这个属性就不会被深度观测，因为当属性原本存在 getter 时，是不会触发取值动作的，
+														// 即 val = obj[key] 不会执行，所以 val 是 undefined，这就导致在后面深度观测的语句中传递给 observe 函数的参数是 undefined
 		val = obj[key]
 	}
 
-	let childOb = !shallow && observe(val)
+	// 将依赖收集到其他容器中，将同样的依赖分别收集到两个不同容器（1.dep，2.childOb.dep）中的原因：收集的依赖的触发时机不同，即作用不同
+	// 第一个容器里收集的依赖触发时机是当属性值被修改时触发，即在set函数中触发：dep.notify()
+	// 第二个容器里收集的依赖触发时机是在使用$set或Vue.set给数据对象添加新属性时触发（因为js语言的限制，没有proxy之前Vue无法拦截到给对象添加属性的操作，所以Vue提供了$set和Vue.set方法给对象添加新属性的同时触发依赖）
+	// __ob__ 属性以及 __ob__.dep 的主要作用是为了添加、删除属性时有能力触发依赖，而这就是 Vue.set 或 Vue.delete 的原理。
+	let childOb = !shallow && observe(val) 
 	Object.defineProperty(obj, key, {
 		enumerable: true,
 		configurable: true,
-		get: function reactiveGetter() {
-			const value = getter ? getter.call(obj) : val
-			if (Dep.target) {
+		get: function reactiveGetter() { // 收集依赖，返回属性值
+			const value = getter ? getter.call(obj) : val // getter保存的是属性原型的get函数，如果getter存在那么直接调用该函数，并以该函数的返回值作为属性的值，如果getter不存在则使用val作为属性的值
+			if (Dep.target) { // Dep.target的值是要被收集的依赖(观察者)
 				// 这里闭包引用了上面的dep常量，注意：每一个数据字段都通过闭包引用着属于自己的 dep 常量
 				//（因为在 walk 函数中通过循环遍历了所有数据对象的属性，并调用 defineReactive 函数，所以每次调用 defineReactive 定义访问器属性时，该属性的 setter/getter 都闭包引用了一个属于自己的“筐”。）
-				dep.depend()
+				dep.depend() // 作用是收集依赖
 				if (childOb) {
 					childOb.dep.depend()
 					if (Array.isArray(value)) {
@@ -195,25 +235,29 @@ export function defineReactive(
 			}
 			return value
 		},
-		set: function reactiveSetter(newVal) {
-			const value = getter ? getter.call(obj) : val
+		set: function reactiveSetter(newVal) { // 返回正确的属性值，触发相应的依赖
+			const value = getter ? getter.call(obj) : val // 取得属性原有的值，拿原有的值和新值作比较，只有在原值和新值不相等的情况下才需要触发依赖和重新设置新属性值
 			/* eslint-disable no-self-compare */
-			if (newVal === value || (newVal !== newVal && value !== value)) {
+			// (newVal !== newVal && value !== value) js中当一个值与自身不全等时，这个值为NaN，即NaN === NaN  // false
+			// 所以此处value !== value说明该属性原有值就是NaN，同时newVal !== newVal说明该属性设置的新值也是NaN，
+			// 所以这个时候新旧值都是 NaN，等价于属性的值没有变化，所以自然不需要做额外的处理了，set 函数直接 return
+			if (newVal === value || (newVal !== newVal && value !== value)) { 
 				return
 			}
 			/* eslint-enable no-self-compare */
-			if (process.env.NODE_ENV !== 'production' && customSetter) {
+			if (process.env.NODE_ENV !== 'production' && customSetter) { // customSetter 函数的作用，用来打印辅助信息（定义initRender函数的时候，有提到customSetter的作用）
 				customSetter()
 			}
 			// #7981: for accessor properties without setter
 			if (getter && !setter) return
-			if (setter) {
-				setter.call(obj, newVal)
+			if (setter) { // 判断setter（常量setter用来存储属性原有的set函数）是否存在
+				setter.call(obj, newVal) // 如果属性原来拥有自身的set函数，则使用该函数设置属性的值，从而保证属性原有的设置操作不受影响
 			} else {
-				val = newVal
+				val = newVal // 如果属性原本就没有set函数，那么就设置val的值：val=newVal
 			}
-			childOb = !shallow && observe(newVal)
-			dep.notify()
+			// 由于属性被设置了新的值，那么假如我们为属性设置的新值是一个数组或者纯对象，那么该数组或纯对象是未被观测的，所以需要对新值进行观测
+			childOb = !shallow && observe(newVal) // !shallow值为true说明需要深度观测
+ 			dep.notify()
 		}
 	})
 }
