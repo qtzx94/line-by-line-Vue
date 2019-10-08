@@ -150,7 +150,7 @@ export function observe(value: any, asRootData: ?boolean): Observer | void { // 
 	) {
 		ob = new Observer(value) // 当一个对象满足以上5个条件时，会创建一个Observer实例，对数据对象进行观测
 	}
-	if (asRootData && ob) {
+	if (asRootData && ob) { // 根数据对象将有用一个特质，即 target.__ob__.vmCount > 0，这样条件 (ob && ob.vmCount) 是成立的，也就是说：当使用 Vue.set/$set 函数为根数据对象添加属性时，是不被允许的。
 		ob.vmCount++
 	}
 	return ob
@@ -312,30 +312,30 @@ export function set(target: Array<any> | Object, key: any, val: any): any {
  */
 export function del(target: Array<any> | Object, key: any) {
 	if (process.env.NODE_ENV !== 'production' &&
-		(isUndef(target) || isPrimitive(target))
+		(isUndef(target) || isPrimitive(target)) // isUndef函数用来判断一个值是否是undefined或null，isPrimitive函数用来判断一个值是否是原始类型值（即：string、number、boolean以及 symbol。）
 	) {
 		warn(`Cannot delete reactive property on undefined, null, or primitive value: ${(target: any)}`)
 	}
 	if (Array.isArray(target) && isValidArrayIndex(key)) {
-		target.splice(key, 1)
+		target.splice(key, 1) // 移除数组元素同样使用了数组的 splice 方法，这样是能够触发响应的。
 		return
 	}
 	const ob = (target: any).__ob__
-	if (target._isVue || (ob && ob.vmCount)) {
+	if (target._isVue || (ob && ob.vmCount)) { // 不能使用 Vue.delete/$delete 删除 Vue 实例对象或根数据的属性，不允许删除 Vue 实例对象的属性，是出于安全因素的考虑。而不允许删除根数据对象的属性，是因为这样做也是触发不了响应的
 		process.env.NODE_ENV !== 'production' && warn(
 			'Avoid deleting properties on a Vue instance or its root $data ' +
 			'- just set it to null.'
 		)
 		return
 	}
-	if (!hasOwn(target, key)) {
+	if (!hasOwn(target, key)) { // hasOwn函数检测key是否是target对象自身拥有的属性
 		return
 	}
-	delete target[key]
-	if (!ob) {
+	delete target[key] // 如果 key 存在于 target 对象上，那么代码将继续运行，此时将使用 delete 语句从 target 上删除属性 key
+	if (!ob) { // 如果ob对象不存在说明 target 对象原本就不是响应的，所以直接返回(return)即可
 		return
 	}
-	ob.dep.notify()
+	ob.dep.notify() // 如果 ob 对象存在，说明 target 对象是响应的，需要触发响应才行，即执行 ob.dep.notify()。
 }
 
 /**
